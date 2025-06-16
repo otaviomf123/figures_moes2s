@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subseasonal (S2S) Model with Mixture of Experts</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .presentation-container {
+            width: 90%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            padding: 50px 40px;
+            min-height: 700px;
+            animation: slideIn 0.5s ease-in-out;
+        }
+
+        .slide.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .slide h1 {
+            color: #2c3e50;
+            font-size: 2.3em;
+            margin-bottom: 25px;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 15px;
+        }
+
+        .slide h2 {
+            color: #34495e;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            border-left: 5px solid #e74c3c;
+            padding-left: 20px;
+        }
+
+        .slide h3 {
+            color: #2980b9;
+            font-size: 1.4em;
+            margin: 18px 0 12px 0;
+        }
+
+        .slide p, .slide li {
+            font-size: 1.05em;
+            line-height: 1.6;
+            color: #34495e;
+            margin-bottom: 12px;
+        }
+
+        .slide ul {
+            margin-left: 25px;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 18px;
+            margin: 25px 0;
+        }
+
+        .tech-card {
+            background: #f8f9fa;
+            padding: 18px;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(255,255,255,0.9);
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .controls button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .controls button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .controls button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .slide-number {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: #34495e;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .model-architecture {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 18px 0;
+            border: 2px dashed #3498db;
+        }
+
+        .variables-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin: 18px 0;
+        }
+
+        .var-category {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #e74c3c;
+        }
+
+        .var-category h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .var-category p {
+            font-size: 0.9em;
+            margin: 5px 0;
+        }
+
+        .results-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border: 2px solid #27ae60;
+        }
+
+        .figure-container {
+            text-align: center;
+            margin: 25px 0;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .figure-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .figure-caption {
+            margin-top: 15px;
+            font-style: italic;
+            color: #555;
+            font-size: 0.95em;
+            line-height: 1.4;
+        }
+
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .perf-metric {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .perf-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #27ae60;
+            margin-bottom: 5px;
+        }
+
+        .perf-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        <div class="slide-number" id="slideNumber">1 / 5</div>
+        
+        <!-- Slide 1: Introduction -->
+        <div class="slide active">
+            <h1>🌍 Subseasonal (S2S) Model with Mixture of Experts</h1>
+            
+            <div class="highlight-box">
+                <h3>🎯 Objective</h3>
+                <p>Develop a deep learning model for subseasonal atmospheric forecasting (2-6 weeks) using Mixture of Experts (MoE) architecture with custom spatial layers.</p>
+            </div>
+
+            <h3>🔬 Scientific Context</h3>
+            <ul>
+                <li><strong>Predictability Gap:</strong> Between weather forecasts (days) and climate predictions (months/years)</li>
+                <li><strong>Importance:</strong> Agriculture, energy, water resource management</li>
+                <li><strong>Challenges:</strong> Multiple temporal and spatial scales, complex teleconnections</li>
+                <li><strong>Predictability Sources:</strong> SST, MJO, QBO, soil conditions and sea ice</li>
+            </ul>
+
+            <h3>🌐 ERA5 Data</h3>
+            <p><strong>Resolution:</strong> Global HEALPix grid with resolution equivalent to ~2°<br>
+            <strong>Period:</strong> 1970-2010 (training data)<br>
+            <strong>Frequency:</strong> Weekly (7-day intervals)<br>
+            <strong>Horizon:</strong> Up to 6 weeks of forecasting</p>
+        </div>
+
+        <!-- Slide 2: Methodology -->
+        <div class="slide">
+            <h1>🛠️ Methodology and Architecture</h1>
+
+            <div class="model-architecture">
+                <h3>🏗️ Mixture of Experts (MoE) Architecture</h3>
+                <p><strong>Concept:</strong> Multiple experts (8) focused on different atmospheric patterns</p>
+                <p><strong>Routing:</strong> Intelligent expert selection system based on local features</p>
+                <p><strong>Advantages:</strong> Specialization in different meteorological regimes</p>
+            </div>
+
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h4>🗺️ Spatial Layers</h4>
+                    <p><strong>SpatialMLPLayer:</strong> Local processing with neighborhood</p>
+                    <p><strong>SpatialConvLayer:</strong> Convolution adapted to spherical geometry</p>
+                    <p><strong>SpatialUpsamplingLayer:</strong> Intelligent spatial interpolation</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4>⚡ Optimizations</h4>
+                    <p><strong>JIT Compilation:</strong> Computational acceleration</p>
+                    <p><strong>Curriculum Learning:</strong> Progressive horizon</p>
+                    <p><strong>Multi-scale:</strong> Processing at different resolutions</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4>🎯 Dual Loss System</h4>
+                    <p><strong>Normalized Loss (α=7):</strong> Gradient stability</p>
+                    <p><strong>Anomaly Loss (β=1):</strong> Physical realism</p>
+                    <p><strong>Balance & Entropy:</strong> Expert utilization</p>
+                </div>
+            </div>
+
+            <h3>🎯 Dual Loss Architecture</h3>
+            <div class="model-architecture">
+                <h4>🧮 Loss Components</h4>
+                <p><strong>L_total = α·L_normalized + β·L_anomaly + L_balance + L_entropy</strong></p>
+                <p><strong>Weights:</strong> α=7 (stability), β=1 (physical realism)</p>
+            </div>
+
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h4>📊 Normalized Loss (MSE)</h4>
+                    <p><strong>Purpose:</strong> Gradient stability and convergence</p>
+                    <p><strong>Space:</strong> Standardized climatological anomalies</p>
+                    <p><strong>Formula:</strong> MSE(y_pred_norm, y_true_norm)</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4>🌡️ Anomaly Loss (Physical)</h4>
+                    <p><strong>Purpose:</strong> Learn physical anomaly patterns</p>
+                    <p><strong>Process:</strong> Denormalize → Calculate climatological anomalies → MSE</p>
+                    <p><strong>Formula:</strong> MSE((y_pred_phys - clim_mean)/clim_std, (y_true_phys - clim_mean)/clim_std)</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4>⚖️ Expert Balance Loss</h4>
+                    <p><strong>Method:</strong> Wasserstein distance</p>
+                    <p><strong>Target:</strong> Uniform expert utilization</p>
+                    <p><strong>Minimum usage:</strong> 2% per expert</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4>🎲 Entropy Loss</h4>
+                    <p><strong>Target:</strong> 45% of maximum entropy</p>
+                    <p><strong>Purpose:</strong> Prevent expert collapse</p>
+                    <p><strong>Promotes:</strong> Specialized but diverse routing</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: Variable Inventory -->
+        <div class="slide">
+            <h1>📊 Atmospheric Variables Inventory</h1>
+
+            <h3>🌡️ Implemented Variables (96 total channels)</h3>
+
+            <div class="variables-grid">
+                <div class="var-category">
+                    <h4>🌪️ Pressure Levels (65 vars)</h4>
+                    <p>• Geopotential (13 levels)</p>
+                    <p>• Temperature (13 levels)</p>
+                    <p>• Relative Humidity (13 levels)</p>
+                    <p>• Zonal Wind U (13 levels)</p>
+                    <p>• Meridional Wind V (13 levels)</p>
+                </div>
+
+                <div class="var-category">
+                    <h4>🌍 Surface (11 vars)</h4>
+                    <p>• 2m Temperature</p>
+                    <p>• 2m Dewpoint Temperature</p>
+                    <p>• Mean Sea Level Pressure</p>
+                    <p>• Sea Surface Temperature</p>
+                    <p>• Sea Ice Cover</p>
+                    <p>• Boundary Layer Height</p>
+                    <p>• CAPE, Total Water Vapor</p>
+                    <p>• Cloud Content, Ozone</p>
+                    <p>• Snow Depth and Density</p>
+                </div>
+
+                <div class="var-category">
+                    <h4>🌱 Soil (8 vars)</h4>
+                    <p>• Soil Temperature (4 levels)</p>
+                    <p>• Soil Moisture (4 levels)</p>
+                    <p><em>Depths: 0-7, 7-28, 28-100, 100-289 cm</em></p>
+                </div>
+
+                <div class="var-category">
+                    <h4>🌧️ Fluxes/Forecast (12 vars)</h4>
+                    <p>• Total Precipitation</p>
+                    <p>• Net Surface Radiation</p>
+                    <p>• Surface Heat Fluxes</p>
+                    <p>• Moisture Flux Divergence</p>
+                    <p>• Energy Conversion</p>
+                    <p><em>Note: Ocean/wave variables not included in this version</em></p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🎯 S2S Predictability Sources</h3>
+                <p><strong>High Importance:</strong> SST (ENSO, PDO), Soil Moisture, MJO, Stratospheric Conditions</p>
+                <p><strong>Time Scales:</strong> 2 weeks - 9 months</p>
+                <p><strong>Teleconnections:</strong> NAO, PNA, AO, SAM, QBO</p>
+            </div>
+        </div>
+
+        <!-- Slide 4: Results -->
+        <div class="slide">
+            <h1>📈 Results and Performance Analysis</h1>
+
+            <div class="results-section">
+                <h3>🎯 Geopotential 500 hPa - Anomaly Correlation Coefficient (ACC)</h3>
+                
+                <div class="figure-container">
+                    <img src="https://github.com/otaviomf123/figures_moes2s/blob/main/acc_global_analysis_2014_2020.png?raw=true" 
+                         alt="ACC Time Series Analysis for Geopotential 500 hPa"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div style="display:none; padding: 40px; background: #f0f0f0; border-radius: 8px; margin: 20px 0;">
+                        <p style="color: #666; text-align: center;">
+                            📊 Geopotential 500 hPa ACC Analysis<br>
+                            <small>Image loading... Please check network connection</small>
+                        </p>
+                    </div>
+                    <div class="figure-caption">
+                        <strong>Figure 1:</strong> Anomaly Correlation Coefficient (ACC) time series for Geopotential at 500 hPa from 2014-2020. 
+                        Top panel shows individual forecast weeks (1-5), bottom panel displays mean ACC with 95% confidence intervals. 
+                        The model maintains skill above 0.8 across all forecast weeks with gradual degradation over lead time.
+                    </div>
+                </div>
+
+                <div class="performance-grid">
+                    <div class="perf-metric">
+                        <div class="perf-value">0.92</div>
+                        <div class="perf-label">Week 1 ACC</div>
+                    </div>
+                    <div class="perf-metric">
+                        <div class="perf-value">0.89</div>
+                        <div class="perf-label">Week 2 ACC</div>
+                    </div>
+                    <div class="perf-metric">
+                        <div class="perf-value">0.86</div>
+                        <div class="perf-label">Week 3 ACC</div>
+                    </div>
+                    <div class="perf-metric">
+                        <div class="perf-value">0.84</div>
+                        <div class="perf-label">Week 5 ACC</div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>🔍 Key Training Innovations</h3>
+            <ul>
+                <li><strong>Dual Loss Strategy:</strong> Combines gradient stability with physical realism</li>
+                <li><strong>Indirect Anomaly Learning:</strong> Model learns anomaly patterns without direct anomaly inputs</li>
+                <li><strong>Climatological Forcing:</strong> Time-aligned climatology as additional input channels</li>
+                <li><strong>Expert Specialization:</strong> Different experts activate for distinct meteorological regimes</li>
+                <li><strong>Curriculum Learning:</strong> Progressive horizon extension from 1 to 6 weeks</li>
+            </ul>
+
+            <div class="highlight-box">
+                <h3>💡 Training Philosophy</h3>
+                <p>The model doesn't work directly with anomalies but learns to reproduce them by:</p>
+                <p>• Training on normalized data (stable gradients)</p>
+                <p>• Being penalized on physical anomaly accuracy (realistic patterns)</p>
+                <p>• Receiving climatological context as forcing (temporal awareness)</p>
+                <p>• This approach forces understanding of both mean state and deviations</p>
+            </div>
+        </div>
+
+        <!-- Slide 5: Future Perspectives -->
+        <div class="slide">
+            <h1>🔮 Future Perspectives and Applications</h1>
+
+            <div class="highlight-box">
+                <h3>🔬 Current Development Status</h3>
+                <p>Model successfully trained with MoE + GAN architecture implemented</p>
+                <p>Processing weekly sequences of 6 timesteps (6 weeks)</p>
+                <p>Advanced optimizations: JIT compilation, curriculum learning, expert balancing</p>
+            </div>
+
+            <h3>📊 Comprehensive Evaluation Metrics</h3>
+            <ul>
+                <li><strong>Mean Square Error (MSE):</strong> Forecast precision assessment</li>
+                <li><strong>Anomaly Correlation:</strong> Ability to predict climate deviations</li>
+                <li><strong>Teleconnection Indices:</strong> Reproduction of patterns like ENSO, NAO</li>
+                <li><strong>Skill Scores:</strong> Comparison with persistence and climatology</li>
+                <li><strong>Spectral Analysis:</strong> Preservation of relevant temporal scales</li>
+            </ul>
+
+            <h3>🚀 Next Steps and Future Work</h3>
+            <ul>
+                <li><strong>Cross-validation:</strong> Testing on independent period (2011-2020)</li>
+                <li><strong>Benchmarking:</strong> Comparison with operational models (ECMWF, NCEP)</li>
+                <li><strong>Expert Analysis:</strong> Interpretation of learned patterns and specializations</li>
+                <li><strong>Variable Expansion:</strong> Inclusion of oceanic and wave variables</li>
+                <li><strong>Extreme Events:</strong> Specific case studies of extreme weather episodes</li>
+                <li><strong>GAN Integration:</strong> Future incorporation of adversarial training for enhanced realism</li>
+                <li><strong>Ensemble Methods:</strong> Multiple model runs for uncertainty quantification</li>
+            </ul>
+
+            <h3>🌍 Real-world Applications</h3>
+            <ul>
+                <li><strong>Agriculture:</strong> Crop planning and seasonal forecasting</li>
+                <li><strong>Energy Sector:</strong> Renewable energy production planning</li>
+                <li><strong>Water Management:</strong> Reservoir operations and flood/drought prediction</li>
+                <li><strong>Insurance:</strong> Climate risk assessment and modeling</li>
+                <li><strong>Public Policy:</strong> Early warning systems for extreme events</li>
+            </ul>
+
+            <div class="highlight-box">
+                <h3>🎯 Scientific Contributions</h3>
+                <p>• First MoE architecture with dual loss system for S2S prediction</p>
+                <p>• Novel indirect anomaly learning without direct anomaly inputs</p>
+                <p>• Spherical geometry-adapted spatial layers for global modeling</p>
+                <p>• Climatological forcing integration with temporal alignment</p>
+                <p>• Expert specialization for different meteorological regimes</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="previousSlide()" id="prevBtn">← Previous</button>
+        <button onclick="nextSlide()" id="nextBtn">Next →</button>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        function showSlide(n) {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (n + totalSlides) % totalSlides;
+            slides[currentSlide].classList.add('active');
+            
+            document.getElementById('slideNumber').textContent = `${currentSlide + 1} / ${totalSlides}`;
+            
+            // Update button states
+            document.getElementById('prevBtn').disabled = currentSlide === 0;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function previousSlide() {
+            if (currentSlide > 0) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        // Initialize
+        showSlide(0);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowRight') nextSlide();
+            if (e.key === 'ArrowLeft') previousSlide();
+        });
+    </script>
+</body>
+</html>
